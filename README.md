@@ -1,41 +1,43 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Custom Progress Bar
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A Flutter package providing a customizable animated circular progress indicator for network speed testing in the Move Green application.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Animated circular progress indicator
+- Real-time speed display
+- Customizable appearance (size, colors, thickness)
+- Start/stop test functionality
+- Completion callback for test results
 
-## Getting started
+## Installation
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add this package to your `pubspec.yaml`:
 
-## Usage
+```yaml
+dependencies:
+  custom_progress_bar:
+    git:
+      url: https://github.com/yourusername/custom_progress_bar.git
+      ref: main
+import 'package:custom_progress_bar/custom_progress_bar.dart';
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
-```
-
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
-# custom_progress_bar
-# custom_progress_bar
+class NetworkTestScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: NetworkSpeedIndicator(
+          size: 150,
+          strokeWidth: 10,
+          progressColor: Colors.green,
+          backgroundColor: Colors.grey.shade300,
+          testDuration: 5000,
+          onTestComplete: (speed) {
+            print('Network test completed: $speed Mbps');
+          },
+        ),
+      ),
+    );
+  }
+}
