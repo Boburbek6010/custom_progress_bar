@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:internet_speed_test/callbacks_enum.dart' show SpeedUnit;
-import 'package:internet_speed_test/internet_speed_test.dart';
+import 'package:flutter_internet_speed_test/flutter_internet_speed_test.dart';
 import 'package:flutter/material.dart';
 
 class SpeedGaugeIndicator extends StatefulWidget {
@@ -112,82 +111,90 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
 
     _controller.reset();
 
-    final internetSpeedTest = InternetSpeedTest();
-
     // Cancel any existing timer
     _speedUpdateTimer?.cancel();
 
-    // Create a flag to track if we've gotten any successful readings
-    bool hasReceivedValidSpeed = false;
+    final speedTest = FlutterInternetSpeedTest();
 
-    // Start actual download speed test
     try {
-      internetSpeedTest.startDownloadTesting(
-        onDone: (double transferRate, SpeedUnit unit) {
+      speedTest.startTesting(
+        useFastApi: true, // Use Fast.com API
+        onStarted: () {
+          print("Speed test started");
+        },
+        onProgress: (double percent, TestResult data) {
+          if (mounted && _isTestRunning) {
+            setState(() {
+              // Set current speed in Mbps
+              _currentSpeed = data.transferRate;
+
+              // Update animation controller based on test progress
+              double controllerValue = percent / 100;
+              if (!_controller.isCompleted && controllerValue <= 1.0) {
+                _controller.value = controllerValue;
+              }
+            });
+          }
+        },
+        onDownloadComplete: (TestResult data) {
+          print("Download test complete: ${data.transferRate} ${data.unit}");
+          if (mounted) {
+            setState(() {
+              _currentSpeed = data.transferRate;
+            });
+          }
+        },
+        onUploadComplete: (TestResult data) {
+          // We're primarily focused on download speed, but you can handle this too
+          print("Upload test complete: ${data.transferRate} ${data.unit}");
+        },
+        onCompleted: (TestResult download, TestResult upload) {
           if (mounted) {
             setState(() {
               _isTestRunning = false;
-              // Convert to Mbps if needed for consistent final result
-              _currentSpeed = unit == SpeedUnit.Kbps
-                  ? transferRate / 1000
-                  : transferRate;
-              hasReceivedValidSpeed = true;
+              _currentSpeed = download.transferRate; // Use download speed as final result
             });
 
-            print("[log] Speed test complete: $_currentSpeed Mbps");
+            print("Speed test complete: Download=${download.transferRate} ${download.unit}, Upload=${upload.transferRate} ${upload.unit}");
 
-            // Complete the animation when test is done
-            if (_controller.status != AnimationStatus.completed) {
-              _controller.forward(from: _controller.value);
+            // Ensure animation completes
+            if (!_controller.isCompleted) {
+              _controller.forward();
             }
-          }
-        },
-        onProgress: (double percent, double transferRate, SpeedUnit unit) {
-          if (mounted && _isTestRunning) {
-            setState(() {
-              // Convert to Mbps if needed for consistent units
-              _currentSpeed = unit == SpeedUnit.Kbps
-                  ? transferRate / 1000
-                  : transferRate;
-              hasReceivedValidSpeed = true;
-
-              // Update controller to match progress percentage
-              if (!_controller.isCompleted) {
-                _controller.animateTo(percent / 100);
-              }
-            });
           }
         },
         onError: (String errorMessage, String speedTestError) {
-          print("flutter: onError : $errorMessage");
-          print("flutter: onError : $speedTestError");
+          print("Speed test error: $errorMessage, $speedTestError");
 
           if (mounted) {
-            // Only fall back to simulation if we never got valid readings
-            if (!hasReceivedValidSpeed) {
-              _fallbackToSimulation();
-            } else {
-              setState(() {
-                _isTestRunning = false;
-              });
-
-              // Complete the animation even on error
-              if (_controller.status != AnimationStatus.completed) {
-                _controller.forward(from: _controller.value);
-              }
-            }
+            // Fall back to simulation on error
+            _fallbackToSimulation();
           }
+        },
+        onDefaultServerSelectionInProgress: () {
+          print("Selecting Fast.com server...");
+        },
+        onDefaultServerSelectionDone: (Client? client) {
+          print("Fast.com server selected: ${client?.location?.city ?? 'Unknown'}");
+        },
+        onCancel: () {
+          if (mounted) {
+            setState(() {
+              _isTestRunning = false;
+            });
+          }
+          print("Speed test cancelled");
         },
       );
     } catch (e) {
-      print("flutter: Exception starting speed test: $e");
+      print("Exception starting speed test: $e");
       _fallbackToSimulation();
     }
   }
 
 // Fallback to simulation when real speed test fails
   void _fallbackToSimulation() {
-    print("flutter: Falling back to simulated speed test");
+    print("Falling back to simulated speed test");
 
     // Simulate speed test updates with acceleration and fluctuation
     _speedUpdateTimer?.cancel();
@@ -195,7 +202,6 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
       if (mounted && _isTestRunning) {
         setState(() {
           // Simulate a realistic speed test with fluctuations
-          // This would be replaced with actual speed test logic
           final progress = _controller.value;
 
           // Create a realistic speed curve (starts slow, accelerates, then stabilizes)
@@ -217,6 +223,15 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
     });
 
     _controller.forward();
+
+    // Set a timer to automatically end the test simulation after a reasonable time
+    Timer(const Duration(seconds: 15), () {
+      if (mounted && _isTestRunning) {
+        setState(() {
+          _isTestRunning = false;
+        });
+      }
+    });
   }
 
   void stopTest() {
