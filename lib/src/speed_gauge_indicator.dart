@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:internet_speed_test/callbacks_enum.dart' show SpeedUnit;
+import 'package:internet_speed_test/internet_speed_test.dart';
 import 'package:flutter/material.dart';
 
 class SpeedGaugeIndicator extends StatefulWidget {
@@ -28,7 +30,7 @@ class SpeedGaugeIndicator extends StatefulWidget {
   final double? speed;
 
   const SpeedGaugeIndicator({
-    Key? key,
+    super.key,
     this.size = 300.0,
     this.arcThickness = 30.0,
     this.progressGradient = const [
@@ -41,7 +43,7 @@ class SpeedGaugeIndicator extends StatefulWidget {
     this.testDuration = 8000,
     this.onTestComplete,
     this.speed,
-  }) : super(key: key);
+  });
 
   @override
   State<SpeedGaugeIndicator> createState() => _SpeedGaugeIndicatorState();
@@ -110,34 +112,81 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
     _controller.reset();
     _currentSpeed = 0.0;
 
-    // Simulate speed test updates with acceleration and fluctuation
-    _speedUpdateTimer?.cancel();
-    _speedUpdateTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
-      if (mounted && _isTestRunning) {
-        setState(() {
-          // Simulate a realistic speed test with fluctuations
-          // This would be replaced with actual speed test logic
-          final progress = _controller.value;
+    final internetSpeedTest = InternetSpeedTest();
 
-          // Create a realistic speed curve (starts slow, accelerates, then stabilizes)
-          if (progress < 0.2) {
-            // Initial connection phase
-            _currentSpeed = progress * 100;
-          } else if (progress < 0.7) {
-            // Main testing phase with fluctuations
-            final baseSpeed = 50 + progress * 200;
-            final fluctuation = 20 * math.sin(progress * 15);
-            _currentSpeed = math.max(0, baseSpeed + fluctuation);
-          } else {
-            // Stabilization phase
-            _currentSpeed = math.min(widget.maxValue,
-                _currentSpeed + (math.Random().nextDouble() * 4 - 1));
+    // Cancel any existing timer
+    _speedUpdateTimer?.cancel();
+
+    // Start actual download speed test
+    internetSpeedTest.startDownloadTesting(
+      onDone: (double transferRate, SpeedUnit unit) {
+        if (mounted) {
+          setState(() {
+            _isTestRunning = false;
+            // Convert to Mbps if needed for consistent final result
+            _currentSpeed = unit == SpeedUnit.Kbps
+                ? transferRate / 1000
+                : transferRate;
+          });
+
+          // Complete the animation when test is done
+          if (_controller.status != AnimationStatus.completed) {
+            _controller.forward(from: _controller.value);
           }
+        }
+      },
+      onProgress: (double percent, double transferRate, SpeedUnit unit) {
+        if (mounted && _isTestRunning) {
+          setState(() {
+            // Convert to Mbps if needed for consistent units
+            _currentSpeed = unit == SpeedUnit.Kbps
+                ? transferRate / 1000
+                : transferRate;
+
+            // Update controller to match progress percentage
+            if (!_controller.isCompleted) {
+              _controller.animateTo(percent / 100);
+            }
+          });
+        }
+      },
+      onError: (String errorMessage, String speedTestError) {
+        if (mounted) {
+          setState(() {
+            _isTestRunning = false;
+          });
+
+          // You might want to add error handling here
+          print('Speed test error: $errorMessage, $speedTestError');
+
+          // Complete the animation even on error
+          if (_controller.status != AnimationStatus.completed) {
+            _controller.forward(from: _controller.value);
+          }
+        }
+      },
+    );
+
+    // Optional: Keep a backup timer in case the speed test callbacks are delayed
+    // This ensures smooth animation in case of delayed callbacks
+    _speedUpdateTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (!mounted || !_isTestRunning) {
+        timer.cancel();
+        return;
+      }
+
+      // This will ensure the controller progresses smoothly regardless of callback frequency
+      if (!_controller.isCompleted) {
+        setState(() {
+          // Only update the controller position, not the speed value
+          // The speed value comes from the real speed test
+          double progressIncrement = 0.005; // Small increment for smooth animation
+          _controller.value = math.min(1.0, _controller.value + progressIncrement);
         });
+      } else {
+        timer.cancel();
       }
     });
-
-    _controller.forward();
   }
 
   void stopTest() {
@@ -204,7 +253,7 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
                   Text(
                     _currentSpeed.toStringAsFixed(2),
                     style: TextStyle(
-                      fontSize: widget.size * 0.18,
+                      fontSize: widget.size * 0.15,
                       fontWeight: FontWeight.w200,
                       color: Colors.white,
                     ),
@@ -245,12 +294,12 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
     for (int i = 0; i < _scaleValues.length; i++) {
       final value = _scaleValues[i];
       // Calculate angle: 225° (bottom-left) to -45° (bottom-right) in radians
-      final startAngle = 225 * (math.pi / 180);
-      final endAngle = -45 * (math.pi / 180);
+      final startAngle = -225 * (math.pi / 180);
+      final endAngle = 75 * (math.pi / 180);
       final totalAngle = startAngle - endAngle;
 
       // Calculate position along the arc
-      final fraction = i / (_scaleValues.length - 1);
+      final fraction = i / (_scaleValues.length);
       final angle = startAngle - (fraction * totalAngle);
 
       // Calculate position
@@ -258,11 +307,11 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
       final y = radius * math.sin(angle);
 
       // Add some padding for the text
-      final paddingFactor = 0.85;
+      final paddingFactor = 0.70;
 
       labels.add(
         Positioned(
-          left: widget.size / 2 + x * paddingFactor - 20,
+          left: widget.size / 2 + x * paddingFactor - 15,
           top: widget.size / 2 + y * paddingFactor - 15,
           child: Text(
             value.toInt().toString(),
@@ -323,7 +372,7 @@ class GaugePainter extends CustomPainter {
     final radius = size.width / 2 - arcThickness / 2;
 
     // Define the arc angles (from bottom-left to bottom-right, covering 270 degrees)
-    final startAngle = 225 * (math.pi / 180);  // 225 degrees in radians
+    final startAngle = -225 * (math.pi / 180);  // 225 degrees in radians
     final fullSweepAngle = 270 * (math.pi / 180);  // 270 degrees in radians
     final currentSweepAngle = fullSweepAngle * progress;
 
