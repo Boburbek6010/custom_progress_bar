@@ -123,10 +123,16 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
           print("Speed test started");
         },
         onProgress: (double percent, TestResult data) {
+          print("Progress: $percent%, Speed: ${data.transferRate} ${data.unit}");
           if (mounted && _isTestRunning) {
             setState(() {
               // Set current speed in Mbps
-              _currentSpeed = data.transferRate;
+              // Convert to Mbps if the unit is not already Mbps
+              if (data.unit.name == "kbps") {
+                _currentSpeed = data.transferRate / 1000; // Convert kbps to Mbps
+              } else {
+                _currentSpeed = data.transferRate;
+              }
 
               // Update animation controller based on test progress
               double controllerValue = percent / 100;
@@ -278,7 +284,7 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
 
               // Gauge arc
               AnimatedBuilder(
-                animation: _speedAnimation,
+                animation: _controller,
                 builder: (context, child) {
                   return CustomPaint(
                     size: Size(widget.size, widget.size),
@@ -375,7 +381,9 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
 
   double _getGaugeProgress() {
     // Map current speed to gauge progress (0-1)
-    return math.min(1.0, _currentSpeed / widget.maxValue);
+    final progress = math.min(1.0, _currentSpeed / widget.maxValue);
+    print("Gauge progress: $progress (speed: $_currentSpeed, max: ${widget.maxValue})");
+    return progress;
   }
 
   Widget _buildControlButton() {
