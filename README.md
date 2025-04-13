@@ -1,8 +1,10 @@
 # Custom Progress Bar
 
-A Flutter package providing a customizable animated circular progress indicator for network speed testing in the Move Green application.
+A Flutter package providing a customizable animated circular progress indicator for network speed testing in the **Move Green** application.
 
-## Features
+---
+
+## ✨ Features
 
 - Animated circular progress indicator
 - Real-time speed display
@@ -10,7 +12,9 @@ A Flutter package providing a customizable animated circular progress indicator 
 - Start/stop test functionality
 - Completion callback for test results
 
-## Installation
+---
+
+## 📦 Installation
 
 Add this package to your `pubspec.yaml`:
 
@@ -20,6 +24,16 @@ dependencies:
     git:
       url: https://github.com/yourusername/custom_progress_bar.git
       ref: main
+
+```
+
+
+
+## Implementation
+
+Here's the implementation of the NetworkSpeedIndicator:
+
+```dart
 import 'package:custom_progress_bar/custom_progress_bar.dart';
 
 class NetworkTestScreen extends StatelessWidget {
@@ -41,3 +55,5 @@ class NetworkTestScreen extends StatelessWidget {
     );
   }
 }
+```
+
