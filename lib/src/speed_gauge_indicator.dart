@@ -123,21 +123,27 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
           print("Speed test started");
         },
         onProgress: (double percent, TestResult data) {
-          print("Progress: $percent%, Speed: ${data.transferRate} ${data.unit}");
+          print("PROGRESS CALLBACK: percent=$percent, speed=${data.transferRate}, unit=${data.unit}, durationInMillis=${data.durationInMillis}");
+
           if (mounted && _isTestRunning) {
             setState(() {
-              // Set current speed in Mbps
-              // Convert to Mbps if the unit is not already Mbps
+              // Debugging
+              print("BEFORE UPDATE: _currentSpeed=$_currentSpeed");
+
+              // Set current speed in Mbps (ensuring proper unit conversion)
               if (data.unit.name == "kbps") {
                 _currentSpeed = data.transferRate / 1000; // Convert kbps to Mbps
               } else {
                 _currentSpeed = data.transferRate;
               }
 
+              print("AFTER UPDATE: _currentSpeed=$_currentSpeed");
+
               // Update animation controller based on test progress
               double controllerValue = percent / 100;
               if (!_controller.isCompleted && controllerValue <= 1.0) {
                 _controller.value = controllerValue;
+                print("CONTROLLER VALUE UPDATED: ${_controller.value}");
               }
             });
           }
@@ -198,7 +204,6 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
     }
   }
 
-// Fallback to simulation when real speed test fails
   void _fallbackToSimulation() {
     print("Falling back to simulated speed test");
 
@@ -209,6 +214,7 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
         setState(() {
           // Simulate a realistic speed test with fluctuations
           final progress = _controller.value;
+          print("SIMULATION: progress=$progress");
 
           // Create a realistic speed curve (starts slow, accelerates, then stabilizes)
           if (progress < 0.2) {
@@ -224,20 +230,15 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
             _currentSpeed = math.min(widget.maxValue,
                 _currentSpeed + (math.Random().nextDouble() * 4 - 1));
           }
+
+          print("SIMULATION: _currentSpeed=$_currentSpeed");
         });
       }
     });
 
+    // Make sure the controller is animating
+    print("Starting controller animation");
     _controller.forward();
-
-    // Set a timer to automatically end the test simulation after a reasonable time
-    Timer(const Duration(seconds: 15), () {
-      if (mounted && _isTestRunning) {
-        setState(() {
-          _isTestRunning = false;
-        });
-      }
-    });
   }
 
   void stopTest() {
@@ -260,6 +261,7 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    print("Building SpeedGaugeIndicator with speed: $_currentSpeed");
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -298,37 +300,40 @@ class _SpeedGaugeIndicatorState extends State<SpeedGaugeIndicator> with SingleTi
               ),
 
               // Center speed display
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _currentSpeed.toStringAsFixed(2),
-                    style: TextStyle(
-                      fontSize: widget.size * 0.15,
-                      fontWeight: FontWeight.w200,
-                      color: Colors.white,
+              Center(
+                key: ValueKey('speed-display-${_currentSpeed.toStringAsFixed(2)}'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _currentSpeed.toStringAsFixed(2),
+                      style: TextStyle(
+                        fontSize: widget.size * 0.15,
+                        fontWeight: FontWeight.w200,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.arrow_downward,
-                        color: Colors.greenAccent,
-                        size: widget.size * 0.06,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Mbps',
-                        style: TextStyle(
-                          fontSize: widget.size * 0.06,
-                          color: Colors.grey[400],
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.arrow_downward,
+                          color: Colors.greenAccent,
+                          size: widget.size * 0.06,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Mbps',
+                          style: TextStyle(
+                            fontSize: widget.size * 0.06,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
             ],
           ),
         ),
